@@ -1,4 +1,5 @@
-﻿/*
+﻿
+/*
  * Author: ByronP
  * Date: 1/14/2017
  * Mod: 4/18/2018
@@ -47,7 +48,7 @@ namespace PureWebSockets
         {
             get => _ws.Options.KeepAliveInterval;
             set => _ws.Options.KeepAliveInterval = value;
-        }        
+        }
 
         public event Data OnData;
         public event Message OnMessage;
@@ -66,7 +67,7 @@ namespace PureWebSockets
             Log("Creating new instance.");
 
             InitializeClient();
-            
+
             StartMonitor();
         }
 
@@ -89,7 +90,7 @@ namespace PureWebSockets
                     {
                         _ws.Options.SetRequestHeader(h.Item1, h.Item2);
                     }
-                    catch(Exception ex)
+                    catch (Exception ex)
                     {
                         Log("Invalid or unsuported header, value: " + h + ", exception: " + ex.Message, nameof(_options.Headers));
                     }
@@ -237,7 +238,7 @@ namespace PureWebSockets
             {
                 _tokenSource.Cancel();
                 _reconnecting = true;
-                if (!Task.WaitAll(new[] {_monitorTask, _listenerTask, _senderTask}, 15000))
+                if (!Task.WaitAll(new[] { _monitorTask, _listenerTask, _senderTask }, 15000))
                 {
                     Log("Reconnect fatality, tasks failed to stop before the timeout.");
                     // exit everything as dead...
@@ -319,19 +320,20 @@ namespace PureWebSockets
                 {
                     while (_ws.State == WebSocketState.Open && !_disposedValue && !_reconnecting)
                     {
-                        var message = "";
+                        var messageBytes = new List<byte>();
                         var binary = new List<byte>();
 
                         READ:
 
                         var buffer = new byte[1024];
+                        var segment = new ArraySegment<byte>(buffer);
                         WebSocketReceiveResult res = null;
 
                         try
                         {
-                            res = await _ws.ReceiveAsync(new ArraySegment<byte>(buffer), _tokenSource.Token);
+                            res = await _ws.ReceiveAsync(segment, _tokenSource.Token);
                         }
-                        catch ( Exception ex )
+                        catch (Exception ex)
                         {
                             Log($"Receive threw an exception: {ex.Message}");
                             // Most likely socket error
@@ -353,34 +355,38 @@ namespace PureWebSockets
                         {
                             if (!res.EndOfMessage)
                             {
-                                message += Encoding.UTF8.GetString(buffer).TrimEnd('\0');
+                                messageBytes.AddRange(buffer.Take(segment.Count));
                                 goto READ;
                             }
-                            message += Encoding.UTF8.GetString(buffer).TrimEnd('\0');
 
+                            messageBytes.AddRange(buffer.Take(segment.Count));
+                            var message = Encoding.UTF8.GetString(messageBytes.ToArray());
+
+#pragma warning disable 4014
                             // support ping/pong if initiated by the server (see RFC 6455)
                             if (message.Trim() == "ping")
-#pragma warning disable 4014
                                 Send("pong");
-#pragma warning restore 4014
                             else
                             {
                                 Log($"Message fully received: {message}");
-                                Task.Run(() => OnMessage?.Invoke(message)).Wait(50);
+                                Task.Run(() => OnMessage?.Invoke(message));
                             }
+#pragma warning restore CS4014
                         }
                         else
                         {
                             // handle binary data
                             if (!res.EndOfMessage)
                             {
-                                binary.AddRange(buffer.Where(b => b != '\0'));
+                                binary.AddRange(buffer.Take(segment.Count));
                                 goto READ;
                             }
 
-                            binary.AddRange(buffer.Where(b => b != '\0'));
+                            binary.AddRange(buffer.Take(segment.Count));
                             Log($"Binary fully received: {Encoding.UTF8.GetString(binary.ToArray())}");
-                            Task.Run(() => OnData?.Invoke(binary.ToArray())).Wait(50);
+#pragma warning disable CS4014
+                            Task.Run(() => OnData?.Invoke(binary.ToArray()));
+#pragma warning restore CS4014
                         }
 
                         // ReSharper disable once RedundantAssignment
@@ -481,7 +487,7 @@ namespace PureWebSockets
                         {
                             i++;
                             Task.Delay(1000).Wait();
-                            if(i > 25)
+                            if (i > 25)
                                 break;
                         }
                     }
