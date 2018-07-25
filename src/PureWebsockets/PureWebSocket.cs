@@ -355,11 +355,11 @@ namespace PureWebSockets
                         {
                             if (!res.EndOfMessage)
                             {
-                                messageBytes.AddRange(buffer.Take(segment.Count));
+                                messageBytes.AddRange(buffer.Take(res.Count));
                                 goto READ;
                             }
 
-                            messageBytes.AddRange(buffer.Take(segment.Count));
+                            messageBytes.AddRange(buffer.Take(res.Count));
                             var message = Encoding.UTF8.GetString(messageBytes.ToArray());
 
 #pragma warning disable 4014
@@ -378,11 +378,11 @@ namespace PureWebSockets
                             // handle binary data
                             if (!res.EndOfMessage)
                             {
-                                binary.AddRange(buffer.Take(segment.Count));
+                                binary.AddRange(buffer.Take(res.Count));
                                 goto READ;
                             }
 
-                            binary.AddRange(buffer.Take(segment.Count));
+                            binary.AddRange(buffer.Take(res.Count));
                             Log($"Binary fully received: {Encoding.UTF8.GetString(binary.ToArray())}");
 #pragma warning disable CS4014
                             Task.Run(() => OnData?.Invoke(binary.ToArray()));
